@@ -25,7 +25,8 @@ public class Lwjgl3Launcher extends ClientLauncher{
                 setWindowWidth(900);
                 setWindowHeight(600);
                 setMaximized(true);
-                setGlEmulation(GLEmulation.GL32);
+                //setGlEmulation(GLEmulation.GL32);
+                setOpenGLEmulation(GLEmulation.ANGLE_GLES20, 0, 0);
                 setWindowIcon(FileType.internal, "icons/icon_64.png");
             }});
         }catch(Throwable e){
