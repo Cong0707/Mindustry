@@ -189,8 +189,8 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         super.add(module);
 
         //autoload modules when necessary
-        if(module instanceof Loadable l){
-            assets.load(l);
+        if(module instanceof Loadable){
+            assets.load((Loadable) module);
         }
     }
 
