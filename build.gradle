@@ -254,23 +254,6 @@ project(":desktop"){
         implementation "com.github.Anuken:steamworks4j:$steamworksVersion"
 
         implementation arcModule("backends:backend-sdl")
-        annotationProcessor 'com.github.Anuken:jabel:0.9.0'
-    }
-}
-
-project(":lwjgl3"){
-    apply plugin: "java"
-
-    compileJava.options.fork = true
-
-    dependencies{
-        implementation project(":core")
-        implementation arcModule("natives:natives-filedialogs")
-        implementation arcModule("natives:natives-desktop")
-        implementation arcModule("natives:natives-freetype-desktop")
-
-        if(debugged()) implementation project(":debug")
-
         implementation arcModule("backends:backend-lwjgl3")
         annotationProcessor 'com.github.Anuken:jabel:0.9.0'
     }

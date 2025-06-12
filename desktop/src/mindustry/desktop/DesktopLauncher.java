@@ -2,6 +2,8 @@ package mindustry.desktop;
 
 import arc.*;
 import arc.Files.*;
+import arc.backend.lwjgl3.Lwjgl3Application;
+import arc.backend.lwjgl3.Lwjgl3ApplicationConfiguration;
 import arc.backend.sdl.*;
 import arc.backend.sdl.jni.*;
 import arc.discord.*;
@@ -26,6 +28,7 @@ import mindustry.type.*;
 
 import java.io.*;
 
+import static arc.Core.settings;
 import static mindustry.Vars.*;
 
 public class DesktopLauncher extends ClientLauncher{
@@ -38,36 +41,131 @@ public class DesktopLauncher extends ClientLauncher{
     public static void main(String[] arg){
         try{
             Vars.loadLogger();
-            new SdlApplication(new DesktopLauncher(arg), new SdlConfig(){{
-                title = "Mindustry";
-                maximized = true;
-                width = 900;
-                height = 700;
-                gl30Minor = 2;
-                gl30 = true;
-                for(int i = 0; i < arg.length; i++){
-                    if(arg[i].charAt(0) == '-'){
-                        String name = arg[i].substring(1);
-                        try{
-                            switch(name){
-                                case "width": width = Strings.parseInt(arg[i + 1], width); break;
-                                case "height": height = Strings.parseInt(arg[i + 1], height); break;
-                                case "glMajor": gl30Major = Strings.parseInt(arg[i + 1], gl30Major);
-                                case "glMinor": gl30Minor = Strings.parseInt(arg[i + 1], gl30Minor);
-                                case "gl3": gl30 = true; break;
-                                case "gl2": gl30 = false; break;
-                                case "coreGl": coreProfile = true; break;
-                                case "antialias": samples = 16; break;
-                                case "debug": Log.level = LogLevel.debug; break;
-                                case "maximized": maximized = Boolean.parseBoolean(arg[i + 1]); break;
+
+            Core.settings = new Settings();
+
+            boolean useLwjgl3 = Core.settings.getBool("useLwjgl3", true);
+            int glEmulation, glAngleBackend;
+            if (new File(OS.getAppDataDirectoryString(appName), "launchid.dat").exists()) {
+                glEmulation = 2;
+                glAngleBackend = 0;
+            } else {
+                glEmulation = Core.settings.getInt("glEmulation", 2);
+                glAngleBackend = Core.settings.getInt("glAngleBackend", 0);
+            }
+
+            if (useLwjgl3) {
+                new Lwjgl3Application(new DesktopLauncher(arg), new Lwjgl3ApplicationConfiguration() {{
+
+                    Lwjgl3ApplicationConfiguration.GLEmulation gl = Lwjgl3ApplicationConfiguration.GLEmulation.values()[glEmulation];
+                    if (gl == null) {
+                        gl = Lwjgl3ApplicationConfiguration.GLEmulation.ANGLE_GLES30;
+                    }
+
+                    Lwjgl3ApplicationConfiguration.GLAngleBackend angleBackend = Lwjgl3ApplicationConfiguration.GLAngleBackend.values()[glAngleBackend];
+                    if (angleBackend == null) {
+                        angleBackend = Lwjgl3ApplicationConfiguration.GLAngleBackend.none;
+                    }
+
+                    setTitle("Mindustry");
+                    setWindowWidth(900);
+                    setWindowHeight(700);
+                    setMaximized(true);
+                    setAngleBackend(angleBackend);
+
+                    int gl30Major = 3;
+                    int gl30Minor = 0;
+
+                    for (int i = 0; i < arg.length; i++) {
+                        if (arg[i].charAt(0) == '-') {
+                            String name = arg[i].substring(1);
+                            try {
+                                switch (name) {
+                                    case "width":
+                                        setWindowWidth(Strings.parseInt(arg[i + 1], getWindowWidth()));
+                                        break;
+                                    case "height":
+                                        setWindowHeight(Strings.parseInt(arg[i + 1], getWindowHeight()));
+                                        break;
+                                    case "glMajor":
+                                        gl30Major = Strings.parseInt(arg[i + 1], gl30Major);
+                                    case "glMinor":
+                                        gl30Minor = Strings.parseInt(arg[i + 1], gl30Minor);
+                                    case "gl3":
+                                        gl = GLEmulation.GL30;
+                                        break;
+                                    case "gl2":
+                                        gl = GLEmulation.GL20;
+                                        break;
+                                    case "debug":
+                                        Log.level = LogLevel.debug;
+                                        break;
+                                    case "maximized":
+                                        setMaximized(Boolean.parseBoolean(arg[i + 1]));
+                                        break;
+                                }
+                            } catch (NumberFormatException number) {
+                                Log.warn("Invalid parameter number value.");
                             }
-                        }catch(NumberFormatException number){
-                            Log.warn("Invalid parameter number value.");
                         }
                     }
-                }
-                setWindowIcon(FileType.internal, "icons/icon_64.png");
-            }});
+
+                    //setGlEmulation(GLEmulation.GL32);
+                    setOpenGLEmulation(gl, gl30Major, gl30Minor);
+
+                    setWindowIcon(FileType.internal, "icons/icon_64.png");
+                }});
+            } else {
+                Vars.loadLogger();
+                new SdlApplication(new DesktopLauncher(arg), new SdlConfig() {{
+                    title = "Mindustry";
+                    maximized = true;
+                    width = 900;
+                    height = 700;
+                    gl30Minor = 2;
+                    gl30 = true;
+                    for (int i = 0; i < arg.length; i++) {
+                        if (arg[i].charAt(0) == '-') {
+                            String name = arg[i].substring(1);
+                            try {
+                                switch (name) {
+                                    case "width":
+                                        width = Strings.parseInt(arg[i + 1], width);
+                                        break;
+                                    case "height":
+                                        height = Strings.parseInt(arg[i + 1], height);
+                                        break;
+                                    case "glMajor":
+                                        gl30Major = Strings.parseInt(arg[i + 1], gl30Major);
+                                    case "glMinor":
+                                        gl30Minor = Strings.parseInt(arg[i + 1], gl30Minor);
+                                    case "gl3":
+                                        gl30 = true;
+                                        break;
+                                    case "gl2":
+                                        gl30 = false;
+                                        break;
+                                    case "coreGl":
+                                        coreProfile = true;
+                                        break;
+                                    case "antialias":
+                                        samples = 16;
+                                        break;
+                                    case "debug":
+                                        Log.level = LogLevel.debug;
+                                        break;
+                                    case "maximized":
+                                        maximized = Boolean.parseBoolean(arg[i + 1]);
+                                        break;
+                                }
+                            } catch (NumberFormatException number) {
+                                Log.warn("Invalid parameter number value.");
+                            }
+                        }
+                    }
+                    setWindowIcon(FileType.internal, "icons/icon_64.png");
+                }});
+            }
         }catch(Throwable e){
             handleCrash(e);
         }

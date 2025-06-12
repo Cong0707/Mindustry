@@ -415,6 +415,55 @@ public class SettingsMenuDialog extends BaseDialog{
             return s + "%";
         });
 
+        if (!mobile){
+            graphics.checkPref("uselwjgl3", true);
+            graphics.sliderPref("glemulation", 2, 0, 3, 1, s -> {
+                Core.settings.put("glEmulation", s);
+                switch (s) {
+                    case 0 -> {
+                        return "ANGLE GLES20";
+                    }
+                    case 1 -> {
+                        return "GL20";
+                    }
+                    case 2 -> {
+                        return "ANGLE GLES30";
+                    }
+                    case 3 -> {
+                        return "GL30";
+                    }
+                }
+                return "";
+            });
+            graphics.sliderPref("glanglebackend", 0, 0, 6, 1, s -> {
+                Core.settings.put("glAngleBackend", s);
+                switch (s) {
+                    case 0 -> {
+                        return "none";
+                    }
+                    case 1 -> {
+                        return "DirectX 9";
+                    }
+                    case 2 -> {
+                        return "DirectX 11";
+                    }
+                    case 3 -> {
+                        return "OpenGL";
+                    }
+                    case 4 -> {
+                        return "OpenGL ES";
+                    }
+                    case 5 -> {
+                        return "Metal";
+                    }
+                    case 6 -> {
+                        return "Vulkan";
+                    }
+                }
+                return "";
+            });
+        }
+
         if(!mobile){
             graphics.checkPref("vsync", true, b -> Core.graphics.setVSync(b));
             graphics.checkPref("fullscreen", false, b -> {
