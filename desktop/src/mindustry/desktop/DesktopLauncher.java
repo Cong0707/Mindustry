@@ -47,7 +47,7 @@ public class DesktopLauncher extends ClientLauncher{
             boolean useLwjgl3 = Core.settings.getBool("useLwjgl3", true);
             int glEmulation, glAngleBackend;
             if (new File(OS.getAppDataDirectoryString(appName), "launchid.dat").exists()) {
-                glEmulation = 2;
+                glEmulation = 3;
                 glAngleBackend = 0;
             } else {
                 glEmulation = Core.settings.getInt("glEmulation", 2);
