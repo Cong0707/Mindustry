@@ -2,6 +2,8 @@ package mindustry.desktop;
 
 import arc.*;
 import arc.Files.*;
+import arc.backend.lwjgl3.Lwjgl3Application;
+import arc.backend.lwjgl3.Lwjgl3ApplicationConfiguration;
 import arc.backend.sdl.*;
 import arc.backend.sdl.jni.*;
 import arc.discord.*;
@@ -31,6 +33,7 @@ import mindustry.ui.dialogs.*;
 
 import java.io.*;
 
+import static arc.Core.settings;
 import static mindustry.Vars.*;
 
 public class DesktopLauncher extends ClientLauncher{
@@ -45,71 +48,124 @@ public class DesktopLauncher extends ClientLauncher{
             Version.init();
             Vars.loadLogger();
             Vars.loadFileLogger(new Fi(Version.isSteam ? "saves" : OS.getAppDataDirectoryString(appName)).child("last_log.txt"));
+            Core.settings = new Settings();
+
+            boolean useLwjgl3 = Core.settings.getBool("useLwjgl3", true);
+            int glEmulation, glAngleBackend;
+            if(new File(OS.getAppDataDirectoryString(appName), "launchid.dat").exists()){
+                glEmulation = 2;
+                glAngleBackend = 0;
+            }else{
+                glEmulation = Core.settings.getInt("glEmulation", 2);
+                glAngleBackend = Core.settings.getInt("glAngleBackend", 0);
+            }
 
             check32Bit();
             checkJavaVersion();
 
-            new SdlApplication(new DesktopLauncher(arg), new SdlConfig(){{
-                title = "Mindustry";
-                maximized = true;
-                coreProfile = true;
-                width = 900;
-                height = 700;
+            if(useLwjgl3){
+                new Lwjgl3Application(new DesktopLauncher(arg), new Lwjgl3ApplicationConfiguration(){{
+                    var glModes = Lwjgl3ApplicationConfiguration.GLEmulation.values();
+                    var angleModes = Lwjgl3ApplicationConfiguration.GLAngleBackend.values();
+                    Lwjgl3ApplicationConfiguration.GLEmulation gl = glEmulation >= 0 && glEmulation < glModes.length ? glModes[glEmulation] : Lwjgl3ApplicationConfiguration.GLEmulation.ANGLE_GLES30;
+                    Lwjgl3ApplicationConfiguration.GLAngleBackend angleBackend = glAngleBackend >= 0 && glAngleBackend < angleModes.length ? angleModes[glAngleBackend] : Lwjgl3ApplicationConfiguration.GLAngleBackend.none;
 
-                //on Windows, Intel drivers might be buggy with OpenGL 3.x, so only use 2.x. See https://github.com/Anuken/Mindustry/issues/11041
-                if(IntelGpuCheck.wasIntel()){
-                    allowGl30 = false;
-                    coreProfile = false;
-                    glVersions = new int[][]{{2, 1}, {2, 0}};
-                }else if(OS.isMac){
-                    //MacOS supports 4.1 at most
-                    glVersions = new int[][]{{4, 1}, {3, 2}, {2, 1}, {2, 0}};
-                }else{
-                    //try essentially every OpenGL version
-                    glVersions = new int[][]{{4, 6}, {4, 5}, {4, 4}, {4, 1}, {3, 3}, {3, 2}, {3, 1}, {2, 1}, {2, 0}};
-                }
+                    setTitle("Mindustry");
+                    setWindowWidth(900);
+                    setWindowHeight(700);
+                    setMaximized(true);
+                    setAngleBackend(angleBackend);
 
-                for(int i = 0; i < arg.length; i++){
-                    if(arg[i].charAt(0) == '-'){
-                        String name = arg[i].substring(1);
-                        switch(name){
-                            case "width" -> width = Strings.parseInt(arg[i + 1], width);
-                            case "height" -> height = Strings.parseInt(arg[i + 1], height);
-                            case "gl" -> {
-                                String str = arg[i + 1];
-                                if(str.contains(".")){
-                                    String[] split = str.split("\\.");
-                                    if(split.length == 2 && Strings.canParsePositiveInt(split[0]) && Strings.canParsePositiveInt(split[1])){
-                                        glVersions = new int[][]{{Strings.parseInt(split[0]), Strings.parseInt(split[1])}};
-                                        allowGl30 = true; //when a version is explicitly specified always allow GL 3
-                                        break;
-                                    }
+                    int gl30Major = 3;
+                    int gl30Minor = 0;
+
+                    for(int i = 0; i < arg.length; i++){
+                        if(arg[i].charAt(0) == '-'){
+                            String name = arg[i].substring(1);
+                            try{
+                                switch(name){
+                                    case "width" -> setWindowWidth(Strings.parseInt(arg[i + 1], getWindowWidth()));
+                                    case "height" -> setWindowHeight(Strings.parseInt(arg[i + 1], getWindowHeight()));
+                                    case "glMajor" -> gl30Major = Strings.parseInt(arg[i + 1], gl30Major);
+                                    case "glMinor" -> gl30Minor = Strings.parseInt(arg[i + 1], gl30Minor);
+                                    case "gl3" -> gl = Lwjgl3ApplicationConfiguration.GLEmulation.GL30;
+                                    case "gl2" -> gl = Lwjgl3ApplicationConfiguration.GLEmulation.GL20;
+                                    case "debug" -> Log.level = LogLevel.debug;
+                                    case "maximized" -> setMaximized(Boolean.parseBoolean(arg[i + 1]));
+                                    case "testMobile" -> testMobile = true;
                                 }
-                                Log.err("Invalid GL version format string: '@'. GL version must be of the form <major>.<minor>", str);
-                            }
-                            case "coreGl" -> coreProfile = true;
-                            case "compatibilityGl" -> coreProfile = false;
-                            case "antialias" -> samples = 16;
-                            case "debug" -> Log.level = LogLevel.debug;
-                            case "maximized" -> maximized = Boolean.parseBoolean(arg[i + 1]);
-                            case "testMobile" -> testMobile = true;
-                            case "gltrace" -> {
-                                Events.on(ClientCreateEvent.class, e -> {
-                                    var profiler = new GLProfiler(Core.graphics);
-                                    profiler.enable();
-                                    Core.app.addListener(new ApplicationListener(){
-                                        @Override
-                                        public void update(){
-                                            profiler.reset();
-                                        }
-                                    });
-                                });
+                            }catch(NumberFormatException number){
+                                Log.warn("Invalid parameter number value.");
                             }
                         }
                     }
-                }
-                setWindowIcon(FileType.internal, "icons/icon_64.png");
-            }});
+
+                    setOpenGLEmulation(gl, gl30Major, gl30Minor);
+                    setWindowIcon(FileType.internal, "icons/icon_64.png");
+                }});
+            }else{
+                new SdlApplication(new DesktopLauncher(arg), new SdlConfig(){{
+                    title = "Mindustry";
+                    maximized = true;
+                    coreProfile = true;
+                    width = 900;
+                    height = 700;
+
+                    //on Windows, Intel drivers might be buggy with OpenGL 3.x, so only use 2.x. See https://github.com/Anuken/Mindustry/issues/11041
+                    if(IntelGpuCheck.wasIntel()){
+                        allowGl30 = false;
+                        coreProfile = false;
+                        glVersions = new int[][]{{2, 1}, {2, 0}};
+                    }else if(OS.isMac){
+                        //MacOS supports 4.1 at most
+                        glVersions = new int[][]{{4, 1}, {3, 2}, {2, 1}, {2, 0}};
+                    }else{
+                        //try essentially every OpenGL version
+                        glVersions = new int[][]{{4, 6}, {4, 5}, {4, 4}, {4, 1}, {3, 3}, {3, 2}, {3, 1}, {2, 1}, {2, 0}};
+                    }
+
+                    for(int i = 0; i < arg.length; i++){
+                        if(arg[i].charAt(0) == '-'){
+                            String name = arg[i].substring(1);
+                            switch(name){
+                                case "width" -> width = Strings.parseInt(arg[i + 1], width);
+                                case "height" -> height = Strings.parseInt(arg[i + 1], height);
+                                case "gl" -> {
+                                    String str = arg[i + 1];
+                                    if(str.contains(".")){
+                                        String[] split = str.split("\\.");
+                                        if(split.length == 2 && Strings.canParsePositiveInt(split[0]) && Strings.canParsePositiveInt(split[1])){
+                                            glVersions = new int[][]{{Strings.parseInt(split[0]), Strings.parseInt(split[1])}};
+                                            allowGl30 = true;
+                                            break;
+                                        }
+                                    }
+                                    Log.err("Invalid GL version format string: '@'. GL version must be of the form <major>.<minor>", str);
+                                }
+                                case "coreGl" -> coreProfile = true;
+                                case "compatibilityGl" -> coreProfile = false;
+                                case "antialias" -> samples = 16;
+                                case "debug" -> Log.level = LogLevel.debug;
+                                case "maximized" -> maximized = Boolean.parseBoolean(arg[i + 1]);
+                                case "testMobile" -> testMobile = true;
+                                case "gltrace" -> {
+                                    Events.on(ClientCreateEvent.class, e -> {
+                                        var profiler = new GLProfiler(Core.graphics);
+                                        profiler.enable();
+                                        Core.app.addListener(new ApplicationListener(){
+                                            @Override
+                                            public void update(){
+                                                profiler.reset();
+                                            }
+                                        });
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    setWindowIcon(FileType.internal, "icons/icon_64.png");
+                }});
+            }
         }catch(Throwable e){
             handleCrash(e);
         }
